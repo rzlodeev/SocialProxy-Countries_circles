@@ -127,7 +127,10 @@ class CirclesGenerator:
                     # First we check if there are only one neighbour - in that case direction will be equal to direction
                     # of that neighbour from our circle point of view.
                     if len(filtered_neighbours) == 1:
-                        direction = filtered_neighbours[0]
+                        direction = filtered_neighbours[0][1]
+
+                    elif len(filtered_neighbours) == 0:
+                        direction = None
 
                     # If there are more than one neighbour, we calculate directions by adding them.
                     else:
@@ -158,33 +161,33 @@ class CirclesGenerator:
 
                     # Now when we have direction to move our circle, we will move it there decreasing it's radius by 1 km
                     # until it will not overlap with border.
+                    if direction:
+                        overlaps = True
+                        radius_deg = (max_radius_km - 1) / 111
+                        while overlaps and radius_deg >= min_radius_deg:
+                            # Handle x coordinate
+                            if direction[0] == "-":
+                                x -= 1 / 111
+                            elif direction[0] == "+":
+                                x += 1 / 111
 
-                    overlaps = True
-                    radius_deg = (max_radius_km - 1) / 111
-                    while overlaps and radius_deg >= min_radius_deg:
-                        # Handle x coordinate
-                        if direction[0] == "-":
-                            x -= 1 / 111
-                        elif direction[0] == "+":
-                            x += 1 / 111
+                            # Handle y coordinate
+                            if direction[1] == "-":
+                                y -= 1 / 111
+                            elif direction[1] == "+":
+                                y += 1 / 111
 
-                        # Handle y coordinate
-                        if direction[1] == "-":
-                            y -= 1 / 111
-                        elif direction[1] == "+":
-                            y += 1 / 111
+                            new_circle = Point(x, y).buffer(radius_deg)
 
-                        new_circle = Point(x, y).buffer(radius_deg)
-
-                        # If it fits, append it to the array of circles and exit loop
-                        if polygon.contains(new_circle):
-                            filtered_circles.append(new_circle)
-                            res_circle = Circle([round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
-                            self.resulting_circles.append(res_circle)
-                            overlaps = False
-                        # Otherwise reduce radius by 1 km and start again
-                        else:
-                            radius_deg = radius_deg - 1 / 111
+                            # If it fits, append it to the array of circles and exit loop
+                            if polygon.contains(new_circle):
+                                filtered_circles.append(new_circle)
+                                res_circle = Circle([round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
+                                self.resulting_circles.append(res_circle)
+                                overlaps = False
+                            # Otherwise reduce radius by 1 km and start again
+                            else:
+                                radius_deg = radius_deg - 1 / 111
 
             return filtered_circles
 
