@@ -212,8 +212,8 @@ class CirclesGenerator:
             if not state_obj.empty:
                 circle.state = state_obj.iloc[0]["name_en"]
 
-            if self.verbose:
-                print("Circle state names parsed...")
+        if self.verbose:
+            print("Circle state names parsed...")
 
 
     def visualize(self, as_shapes=False):
@@ -237,19 +237,47 @@ class CirclesGenerator:
         plt.title(f'Circles within {self.country_name}')
         plt.show()
 
-    def save_csv(self) -> str:
+    def save_csv(self, temp_dir=False) -> str:
         """Outputs result circles for country in CSV file format.
         Columns: state, x coordinate, y coordinate, radius.
+        :param temp_dir: Save output file to temp dir instead of output_files root.
         :return: String with resulted file name
         """
-        with open(f'./output_files/{self.country_name}.csv', 'w', newline='') as file:
+        if temp_dir:
+            dir_path = './output_files/temp'
+        else:
+            dir_path = './output_files'
+
+        with open(f'{dir_path}/{self.country_name}.csv', 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+
+            column_names = ['Region', 'X coordinate', 'Y coordinate', 'Radius']
+            writer.writerow(column_names)
+
             data = []
             for circle in self.resulting_circles:
                 data.append([circle.state, circle.coordinates[0], circle.coordinates[1], circle.radius])
 
-            writer = csv.writer(file)
             writer.writerows(data)
 
         return os.path.abspath(f'./output_files/{self.country_name}.csv')
+
+    def countries_list(self):
+        """Returns list with all countries names"""
+        countries = []
+        if self.verbose:
+            print("Getting list of all country names...")
+        for index, country in self.world.iterrows():
+            countries.append(country['SOVEREIGNT'])
+
+        return countries
+
+    def whole_world(self):
+        """
+        Results in circles for all countries over the world.
+        :return: Path to CSV file with results.
+        """
+        for index, country in self.world.iterrows():
+            country_name = country['SOVEREIGNT']
 
 
