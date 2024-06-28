@@ -43,6 +43,7 @@ python main.py --arguments
 ### Common use-cases:
 
 Get CSV file for specified country:
+> Make sure you first letter of country name is capital. You can check available country names using -l argument
 ```bash
 python main.py -c Italy
 ```
@@ -67,5 +68,5 @@ python main.py -c Italy -m
 | `--visualize` | `-m` | `store_true` | Visualize result using matplotlib. | False |
 | `--list-countries` | `-l` | `store_true` | List all available countries names. | False |
 | `--verbose` | `-v` | `store_true` | Verbose mode. Keeps you in touch with program progress. | False |
-
+| `--overwrite-files` | `-o` | `store_true`| Overwrite existing files in temp directory when processing the whole world. | False |
 

@@ -19,6 +19,7 @@ def main():
     parser.add_argument('-m', '--visualize', action='store_true', help='Visualize result using matplotlib.')
     parser.add_argument('-l', '--list-countries', action='store_true', help='List all available countries names')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode. Keeps you in touch with program progress.')
+    parser.add_argument('-o', '--overwrite-files', action='store_true', help='Overwrite existing files in temp directory when processing the whole world.')
     args = parser.parse_args()
 
     # Generate circles itself
@@ -50,18 +51,21 @@ def generate_world(args):
     circles_generator = CirclesGenerator(verbose=args.verbose)
     world = circles_generator.world
     country_names = []  # Placeholder for processed country names to exclude re-running the same country twice
+    csvs_dir = '/output_files/temp'
 
     # Iterate to get each country, save it to csv and merge csv into one big file
     for index, country in world.iterrows():
         country_name = country['SOVEREIGNT']
         if country_name not in country_names:
-            print(f'Processing {country_name}...')
             country_names.append(country_name)
-            circles_generator.generate_circles(country_name, args.min_radius, args.max_radius)
-            circles_generator.add_areas_names()
-            circles_generator.save_csv(temp_dir=True)
+            if args.overwrite_files or f'{country_name}.csv' not in os.listdir(csvs_dir):
+                print(f'Processing {country_name}...')
+                circles_generator.generate_circles(country_name, args.min_radius, args.max_radius)
+                circles_generator.add_areas_names()
+                circles_generator.save_csv(temp_dir=True)
+            else:
+                print(f'{country_name} loaded from previous existing CSV file')
 
-    csvs_dir = '/output_files/temp'
     dfs = []  # Dataframes placeholder
 
     for filename in os.listdir(csvs_dir):
