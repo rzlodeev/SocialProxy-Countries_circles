@@ -51,7 +51,7 @@ def generate_world(args):
     circles_generator = CirclesGenerator(verbose=args.verbose)
     world = circles_generator.world
     country_names = []  # Placeholder for processed country names to exclude re-running the same country twice
-    csvs_dir = '/output_files/temp'
+    csvs_dir = './output_files/temp'
 
     # Iterate to get each country, save it to csv and merge csv into one big file
     for index, country in world.iterrows():

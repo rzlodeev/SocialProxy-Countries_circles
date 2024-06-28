@@ -46,7 +46,7 @@ Get CSV file for specified country:
 > Make sure you first letter of country name is capital. You can check available country names using -l argument
 ```bash
 python main.py -c Italy
-```
+```    gf s
 
 Get CSV file for all countries in a world:
 ```bash
