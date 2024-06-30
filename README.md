@@ -46,7 +46,12 @@ Get CSV file for specified country:
 > Make sure you first letter of country name is capital. You can check available country names using -l argument
 ```bash
 python main.py -c Italy
-```    gf s
+```
+
+Countries with several words in the name are typed with brackets. Note that each word also starts with a capital.
+You can also call several countries at once.
+```bash
+python main.py -c Italy 'Saudi Arabia' -v
 
 Get CSV file for all countries in a world:
 ```bash
@@ -57,6 +62,16 @@ Visualize result:
 ```bash
 python main.py -c Italy -m
 ```
+
+Render and open map for pre-made csv file:
+```bash
+python main.py -f Italy
+```
+
+Each csv and html map file follows this name structure:
+
+`country name(-s), two underscores, min circle radius, dash, max circle radius.`
+
 
 ### Arguments definition
 | Argument | Short Form | Type | Description | Default |

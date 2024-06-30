@@ -1,7 +1,6 @@
 import geopandas as gpd
 import shapely
 from shapely.geometry import Point, Polygon, box
-from shapely.affinity import scale
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -24,7 +23,10 @@ class CirclesGenerator:
         self.polygon = None  # Placeholder for shape of a country
         self.filtered_circles = []  # Placeholder for circles within country shape in shape format
         self.resulting_circles = []  # Placeholder for circles in output format - [[x, y], radius]
-        self.world = gpd.read_file('./data/world-administrative-boundaries/world-administrative-boundaries.shp')  # Shapes of all countries
+
+        # Loading shapefiles of countries and converting them to EPSG:3857 - pseudo mercator coordinate system,
+        # which is used in OpenStreetMap. Note: coordinates are represented in meters, not degrees.
+        self.world = gpd.read_file('./data/world-administrative-boundaries/world-administrative-boundaries.shp').to_crs('EPSG:3857')  # Shapes of all countries
         self.states = gpd.read_file('./data/ne_10m_admin_1_states_provinces/ne_10m_admin_1_states_provinces.shp')  # Shapes of all states in countries
 
         self.verbose = verbose
@@ -57,62 +59,52 @@ class CirclesGenerator:
         min_radius_km = min_circle_radius
         max_radius_km = max_circle_radius
 
-        max_radius_deg = max_radius_km / 111  # Approximate conversion: 1 degree ~ 111 km
-        min_radius_deg = min_radius_km / 111
+        max_radius_m = max_radius_km * 1000
+        min_radius_m = min_radius_km * 1000
 
         # Generate circles
-        def generate_circles_within_bbox(bbox: Polygon, radius_deg) -> list:
+        def generate_circles_within_bbox(bbox: Polygon, max_radius_m) -> list:
             """
-            Generates circles of maximum radius circle that fit the box of country shape entirely
+            Generates circles of maximum radius circle that fit the box of country shape entirely.
             :param bbox: bbox object with country shape
-            :param radius_deg: radius of circle in degrees (km divided by 111)
+            :param max_radius_m: maximum radius of circle in meters
             :return:
             """
             x_min, y_min, x_max, y_max = bbox.bounds
-            y_range = np.arange(y_min + radius_deg, y_max, radius_deg * 2)
+            x_range = np.arange(x_min + max_radius_m, x_max, max_radius_m * 2)
+            y_range = np.arange(y_min + max_radius_m, y_max, max_radius_m * 2)
 
             circles = []
-
-            for y in y_range:
-                # Adjust the x-range based on the latitude to maintain consistent distances in kilometers
-                x_scale_fact = np.cos(np.radians(y))
-                radius_deg_lon = radius_deg / x_scale_fact
-                x_range = np.arange(x_min + radius_deg_lon, x_max, radius_deg_lon * 2)
-                for x in x_range:
-                    circle = Point(x, y).buffer(radius_deg)
-                    oval = scale(circle, xfact=(1/x_scale_fact), yfact=1)
-                    if bbox.contains(oval):
-                        circles.append(oval)
-
+            for x in x_range:
+                for y in y_range:
+                    circle = Point(x, y).buffer(max_radius_m)
+                    if bbox.contains(circle):
+                        circles.append(circle)
             return circles
 
-        circles = generate_circles_within_bbox(bounding_box, max_radius_deg)
+        circles = generate_circles_within_bbox(bounding_box, max_radius_m)
 
         if self.verbose:
             print("Approximate circles generated, adjusting...")
 
-        def filter_circles_within_polygon(circles, polygon: Polygon, second_try=False) -> list:
+        def filter_circles_within_polygon(circles, polygon: Polygon) -> list:
             """Filters circles that are fully within country shape"""
             filtered_circles = []
             for circle in circles:
                 # First we check if circle is within a country shape.
                 if polygon.contains(circle):
                     filtered_circles.append(circle)
-                    circle_coordinates = [round(circle.centroid.x.item(), 7), round(circle.centroid.y.item(), 7)]
-                    y_min, y_max = circle.bounds[1], circle.bounds[3]
-                    circle_radius = max_circle_radius if not second_try else min_circle_radius
+                    circle_coordinates = [circle.centroid.x.item(), circle.centroid.y.item()]
+                    circle_radius = max_radius_km * 1000
                     res_circle = Circle(circle_coordinates, round(circle_radius))
                     self.resulting_circles.append(res_circle)
 
                 # If not, but circle is on the country border, we'll play with circle radius and position
                 # to find one that fits. We will find neighbouring circles within country, then move our circle
-                # in their direction, slightly reducing it's radius until it fits.
+                # in their direction, slightly reducing its radius until it fits.
                 elif shapely.overlaps(circle, polygon):
                     x = circle.centroid.x
                     y = circle.centroid.y
-
-                    x_scale_fact = np.cos(np.radians(y))
-                    x_max_radius_deg = max_radius_deg / x_scale_fact  # Adjusting scales for x coordinate
 
                     # Find neighbours circle coordinates by generating them and filtering ones that are within country.
                     # Also store direction to that neighbour. It's coded for further simpler parsing in a following format:
@@ -120,21 +112,18 @@ class CirclesGenerator:
                     # + is increasing, - is decreasing, 0 is remaining the same. For example, "+0" means that x value is increased,
                     # y remains the same, therefore it's direction to the right.
 
-                    top_neighbour = [Point(x, y + max_radius_deg).buffer(max_radius_deg), "0+"]
-                    top_right_neighbour = [Point(x + x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "++"]
-                    right_neighbour = [Point(x + x_max_radius_deg, y).buffer(max_radius_deg), "+0"]
-                    right_bottom_neighbour = [Point(x + x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "+-"]
-                    bottom_neighbour = [Point(x, y - max_radius_deg).buffer(max_radius_deg), "0-"]
-                    bottom_left_neighbour = [Point(x - x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "--"]
-                    left_neighbour = [Point(x - x_max_radius_deg, y).buffer(max_radius_deg), "-0"]
-                    left_top_neighbour = [Point(x - x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "-+"]
+                    top_neighbour = [Point(x, y + max_radius_m).buffer(max_radius_m), "0+"]
+                    top_right_neighbour = [Point(x + max_radius_m, y + max_radius_m).buffer(max_radius_m), "++"]
+                    right_neighbour = [Point(x + max_radius_m, y).buffer(max_radius_m), "+0"]
+                    right_bottom_neighbour = [Point(x + max_radius_m, y - max_radius_m).buffer(max_radius_m), "+-"]
+                    bottom_neighbour = [Point(x, y - max_radius_m).buffer(max_radius_m), "0-"]
+                    bottom_left_neighbour = [Point(x - max_radius_m, y - max_radius_m).buffer(max_radius_m), "--"]
+                    left_neighbour = [Point(x - max_radius_m, y).buffer(max_radius_m), "-0"]
+                    left_top_neighbour = [Point(x - max_radius_m, y + max_radius_m).buffer(max_radius_m), "-+"]
 
                     neighbours = [top_neighbour, top_right_neighbour, right_neighbour,
                                   right_bottom_neighbour, bottom_neighbour, bottom_left_neighbour,
                                   left_neighbour, left_top_neighbour]
-
-                    for n in neighbours:
-                        n[0] = scale(n[0], xfact=np.cos(np.radians(y)), yfact=1)
 
                     filtered_neighbours = [neighbour for neighbour in neighbours if polygon.contains(neighbour[0])]
 
@@ -177,39 +166,33 @@ class CirclesGenerator:
                     # until it will not overlap with border.
                     if direction:
                         overlaps = True
-                        radius_deg = (max_radius_km - 1) / 111
-                        while overlaps and radius_deg >= min_radius_deg:
+                        radius_m = max_radius_m - 1000
+                        while overlaps and radius_m >= min_radius_m:
                             # Handle x coordinate
                             if direction[0] == "-":
-                                x -= (1 / 111) / np.cos(np.radians(y))
+                                x -= 1000
                             elif direction[0] == "+":
-                                x += (1 / 111) / np.cos(np.radians(y))
+                                x += 1000
 
                             # Handle y coordinate
                             if direction[1] == "-":
-                                y -= 1 / 111
+                                y -= 1000
                             elif direction[1] == "+":
-                                y += 1 / 111
+                                y += 1000
 
-                            new_circle = Point(x, y).buffer(radius_deg)
-                            new_oval = scale(new_circle, xfact=1/x_scale_fact, yfact=1)
+                            new_circle = Point(x, y).buffer(radius_m)
 
                             # If it fits, append it to the array of circles and exit loop
-                            if polygon.contains(new_oval):
-                                filtered_circles.append(new_oval)
-                                res_circle = Circle([round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
+                            if polygon.contains(new_circle):
+                                filtered_circles.append(new_circle)
+                                res_circle = Circle([x.item(), y.item()], radius_m)
                                 self.resulting_circles.append(res_circle)
                                 overlaps = False
                             # Otherwise reduce radius by 1 km and start again
                             else:
-                                radius_deg = radius_deg - 1 / 111
+                                radius_m = radius_m - 1000
 
-            if filtered_circles:
-                return filtered_circles
-            elif not second_try:
-                # If country to small and 10km circles didn't fit in, call function again with 1 km circles
-                small_circles = generate_circles_within_bbox(self.bounding_box, min_radius_deg)
-                return filter_circles_within_polygon(small_circles, polygon, second_try=True)
+            return filtered_circles
 
         filtered_circles = filter_circles_within_polygon(circles, polygon)
         self.filtered_circles = filtered_circles
@@ -254,19 +237,17 @@ class CirclesGenerator:
         else:
             for circle in self.resulting_circles:
                 center = circle.coordinates
-                radius = circle.radius / 111
+                radius = circle.radius
                 circle_patch = plt.Circle(center, radius, edgecolor='red', facecolor='none')
                 ax.add_patch(circle_patch)
 
         plt.title(f'Circles within {self.country_name}')
         plt.show()
 
-    def save_csv(self, min_r, max_r, temp_dir=False) -> str:
+    def save_csv(self, temp_dir=False) -> str:
         """Outputs result circles for country in CSV file format.
         Columns: state, x coordinate, y coordinate, radius.
         :param temp_dir: Save output file to temp dir instead of output_files root.
-        :param min_r:
-        :param max_r: Min and max radius of circles to mark them in filename
         :return: String with resulted file name
         """
         if temp_dir:
@@ -274,7 +255,7 @@ class CirclesGenerator:
         else:
             dir_path = './output_files'
 
-        with open(f'{dir_path}/{self.country_name}__{min_r}-{max_r}.csv', 'w', newline='', encoding='utf-8') as file:
+        with open(f'{dir_path}/{self.country_name}.csv', 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
 
             column_names = ['Region', 'X coordinate', 'Y coordinate', 'Radius']
@@ -282,7 +263,14 @@ class CirclesGenerator:
 
             data = []
             for circle in self.resulting_circles:
-                data.append([circle.state, circle.coordinates[0], circle.coordinates[1], circle.radius])
+                # Converting meter-based coordinate system to latitude and longitude in degrees
+                # and radius to kilometers.
+                point = Point(circle.coordinates[0], circle.coordinates[1])
+                gdf_proj = gpd.GeoDataFrame(geometry=[point], crs='EPSG:3857')
+                gdf_epsg4326 = gdf_proj.to_crs('EPSG:4326')
+                x_lon, y_lat = gdf_epsg4326.geometry.iloc[0].x, gdf_epsg4326.geometry.iloc[0].y
+
+                data.append([circle.state, x_lon, y_lat, circle.radius / 1000])
 
             writer.writerows(data)
 

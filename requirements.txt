@@ -4,3 +4,4 @@ geodatasets
 numpy
 shapely
 matplotlib
+folium
