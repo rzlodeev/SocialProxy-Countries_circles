@@ -15,7 +15,7 @@ def main():
     country_or_world_group = parser.add_mutually_exclusive_group()
     country_or_world_group.add_argument('-c', '--country-name', type=str, nargs='+', help='Name of a country you want to get circles for.')
     country_or_world_group.add_argument('-w', '--world', action='store_true', help='Get countries for all countries in the world.')
-    parser.add_argument('-mn', '--min-radius', type=int, help='Min radius of resulting circles in kilometers. Defaults to 1.', default=1)
+    parser.add_argument('-mn', '--min-radius', type=float, help='Min radius of resulting circles in kilometers. Defaults to 1.', default=1)
     parser.add_argument('-mx', '--max-radius', type=int, help='Max radius of resulting circles in kilometers. Defaults to 10.', default=10)
     parser.add_argument('-m', '--visualize', action='store_true', help='Visualize result using matplotlib.')
     parser.add_argument('-l', '--list-countries', action='store_true', help='List all available countries names')
@@ -93,6 +93,13 @@ def generate_world(args):
     merged_df = pd.concat(dfs, ignore_index=True)
     output_path = f'./output_files/1world__{args.min_radius}-{args.max_radius}.csv'
     merged_df.to_csv(output_path, index=False)
+
+
+    if args.visualize:
+        print('Creating map...')
+        webmap = Webmap()
+        webmap.show(world, min_r=args.min_radius, max_r=args.max_radius)
+
     print('World processing finished.')
 
 

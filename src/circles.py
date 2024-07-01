@@ -39,6 +39,7 @@ class CirclesGenerator:
         :param as_shapes: If true, returns circles shapes instead of coordinates and radius
         :return: List of
         """
+        self.resulting_circles = []  # Clear circles from previous generation
         self.country_name = country_name
         country = self.world.loc[self.world['name'] == country_name]
 
