@@ -11,7 +11,8 @@ import os
 
 class Circle:
     """Represents generated circle"""
-    def __init__(self, coordinates: list[float, float], radius: int, state=""):
+    def __init__(self, country_name: str, coordinates: list[float, float], radius: int, state=""):
+        self.country = country_name
         self.state = state
         self.coordinates = coordinates
         self.radius = radius
@@ -101,7 +102,7 @@ class CirclesGenerator:
                     circle_coordinates = [round(circle.centroid.x.item(), 7), round(circle.centroid.y.item(), 7)]
                     y_min, y_max = circle.bounds[1], circle.bounds[3]
                     circle_radius = max_circle_radius if not second_try else min_circle_radius
-                    res_circle = Circle(circle_coordinates, round(circle_radius))
+                    res_circle = Circle(country_name, circle_coordinates, round(circle_radius))
                     self.resulting_circles.append(res_circle)
 
                 # If not, but circle is on the country border, we'll play with circle radius and position
@@ -197,7 +198,7 @@ class CirclesGenerator:
                             # If it fits, append it to the array of circles and exit loop
                             if polygon.contains(new_oval):
                                 filtered_circles.append(new_oval)
-                                res_circle = Circle([round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
+                                res_circle = Circle(country_name, [round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
                                 self.resulting_circles.append(res_circle)
                                 overlaps = False
                             # Otherwise reduce radius by 1 km and start again
@@ -282,7 +283,7 @@ class CirclesGenerator:
 
             data = []
             for circle in self.resulting_circles:
-                data.append([circle.state, circle.coordinates[0], circle.coordinates[1], circle.radius])
+                data.append([f'{circle.country}_{circle.state}', circle.coordinates[0], circle.coordinates[1], circle.radius])
 
             writer.writerows(data)
 
