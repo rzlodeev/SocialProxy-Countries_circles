@@ -98,7 +98,7 @@ def generate_world(args):
     if args.visualize:
         print('Creating map...')
         webmap = Webmap()
-        webmap.show(world, min_r=args.min_radius, max_r=args.max_radius)
+        webmap.show(world, min_r=args.min_radius, max_r=args.max_radius, world=True)
 
     print('World processing finished.')
 

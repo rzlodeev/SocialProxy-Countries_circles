@@ -6,7 +6,7 @@ from src.circles import CirclesGenerator
 
 
 class Webmap:
-    def show(self, country_names: list, min_r, max_r):
+    def show(self, country_names: list, min_r, max_r, world=False):
         """
         Renders circles given csv files using matplotlib
         :param country_names: List with names of countries to render
@@ -63,7 +63,10 @@ class Webmap:
                     popup=f'Location: {row["Region"]}\nLan: {row["Y"]}\nLon: {row["X"]}\nRadius: {row["Radius"]}'
                 ).add_to(m)
 
-            output_file_path = f'./output_files/maps/{"__".join(country_names)}__{min_r}-{max_r}.html'
+            if not world:
+                output_file_path = f'./output_files/maps/{"__".join(country_names)}__{min_r}-{max_r}.html'
+            else:
+                output_file_path = f'./output_files/maps/world.html'
             m.save(output_file_path)
             print(f'HTML file with map was saved to {os.path.abspath(output_file_path)}')
             webbrowser.open('file://' + os.path.realpath(output_file_path))
