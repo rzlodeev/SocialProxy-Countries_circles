@@ -287,12 +287,12 @@ class CirclesGenerator:
         with open(f'{dir_path}/{self.country_name}__{min_r}-{max_r}.csv', 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
 
-            column_names = ['Region', 'X coordinate', 'Y coordinate', 'Radius']
+            column_names = ['Region', 'Latitude', 'Longitude', 'Radius']
             writer.writerow(column_names)
 
             data = []
             for circle in self.resulting_circles:
-                data.append([f'{circle.country}_{circle.state}', circle.coordinates[0], circle.coordinates[1], circle.radius])
+                data.append([f'{circle.country}_{circle.state}', circle.coordinates[1], circle.coordinates[0], circle.radius])
 
             writer.writerows(data)
 

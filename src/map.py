@@ -45,8 +45,8 @@ class Webmap:
             merged_df = pd.concat(dataframes, ignore_index=True)
 
             # Convert columns to numeric and handle errors
-            merged_df['X'] = pd.to_numeric(merged_df['X coordinate'], errors='coerce')
-            merged_df['Y'] = pd.to_numeric(merged_df['Y coordinate'], errors='coerce')
+            merged_df['X'] = pd.to_numeric(merged_df['Longitude'], errors='coerce')
+            merged_df['Y'] = pd.to_numeric(merged_df['Latitude'], errors='coerce')
             merged_df['radius'] = pd.to_numeric(merged_df['Radius'], errors='coerce')
 
             # Drop rows with NaN values
@@ -60,7 +60,7 @@ class Webmap:
                     location=[row['Y'], row['X']],
                     radius=row['radius'] * 1000,  # Folium radius should be set in meters, in CSV they are in kilometers
                     color='blue',
-                    popup=f'Location: {row["Region"]}\nLan: {row["Y"]}\nLon: {row["X"]}\nRadius: {row["Radius"]}'
+                    popup=f'Location: {row["Region"]}\nLat: {row["Y"]}\nLon: {row["X"]}\nRadius: {row["Radius"]}'
                 ).add_to(m)
 
             if not world:
