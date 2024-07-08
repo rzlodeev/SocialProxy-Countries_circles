@@ -4,6 +4,7 @@ from shapely.geometry import Point, Polygon, box
 from shapely.affinity import scale
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 import csv
 import os
@@ -96,120 +97,124 @@ class CirclesGenerator:
         def filter_circles_within_polygon(circles, polygon: Polygon, second_try=False) -> list:
             """Filters circles that are fully within country shape"""
             filtered_circles = []
-            for circle in circles:
-                # First we check if circle is within a country shape.
-                if polygon.contains(circle):
-                    filtered_circles.append(circle)
-                    circle_coordinates = [round(circle.centroid.x.item(), 7), round(circle.centroid.y.item(), 7)]
-                    y_min, y_max = circle.bounds[1], circle.bounds[3]
-                    circle_radius = max_circle_radius if not second_try else min_circle_radius
-                    res_circle = Circle(country_name, circle_coordinates, round(circle_radius))
-                    self.resulting_circles.append(res_circle)
+            with tqdm(total=len(circles), desc="Adjusting circles on borders", unit="circle") as pbar:  # Show progress bar
+                for i, circle in enumerate(circles):
+                    # First we check if circle is within a country shape.
+                    if polygon.contains(circle):
+                        filtered_circles.append(circle)
+                        circle_coordinates = [round(circle.centroid.x.item(), 7), round(circle.centroid.y.item(), 7)]
+                        y_min, y_max = circle.bounds[1], circle.bounds[3]
+                        circle_radius = max_circle_radius if not second_try else min_circle_radius
+                        res_circle = Circle(country_name, circle_coordinates, round(circle_radius))
+                        self.resulting_circles.append(res_circle)
 
-                # If not, but circle is on the country border, we'll play with circle radius and position
-                # to find one that fits. We will find neighbouring circles within country, then move our circle
-                # in their direction, slightly reducing it's radius until it fits.
-                elif shapely.overlaps(circle, polygon):
-                    x = circle.centroid.x
-                    y = circle.centroid.y
+                    # If not, but circle is on the country border, we'll play with circle radius and position
+                    # to find one that fits. We will find neighbouring circles within country, then move our circle
+                    # in their direction, slightly reducing it's radius until it fits.
+                    elif shapely.overlaps(circle, polygon):
+                        x = circle.centroid.x
+                        y = circle.centroid.y
 
-                    x_scale_fact = np.cos(np.radians(y))
-                    x_max_radius_deg = max_radius_deg / x_scale_fact  # Adjusting scales for x coordinate
+                        x_scale_fact = np.cos(np.radians(y))
+                        x_max_radius_deg = max_radius_deg / x_scale_fact  # Adjusting scales for x coordinate
 
-                    # Find neighbours circle coordinates by generating them and filtering ones that are within country.
-                    # Also store direction to that neighbour. It's coded for further simpler parsing in a following format:
-                    # String of two characters +, - or 0. First character in a string represents x axis, second - y axis.
-                    # + is increasing, - is decreasing, 0 is remaining the same. For example, "+0" means that x value is increased,
-                    # y remains the same, therefore it's direction to the right.
+                        # Find neighbours circle coordinates by generating them and filtering ones that are within country.
+                        # Also store direction to that neighbour. It's coded for further simpler parsing in a following format:
+                        # String of two characters +, - or 0. First character in a string represents x axis, second - y axis.
+                        # + is increasing, - is decreasing, 0 is remaining the same. For example, "+0" means that x value is increased,
+                        # y remains the same, therefore it's direction to the right.
 
-                    top_neighbour = [Point(x, y + max_radius_deg).buffer(max_radius_deg), "0+"]
-                    top_right_neighbour = [Point(x + x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "++"]
-                    right_neighbour = [Point(x + x_max_radius_deg, y).buffer(max_radius_deg), "+0"]
-                    right_bottom_neighbour = [Point(x + x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "+-"]
-                    bottom_neighbour = [Point(x, y - max_radius_deg).buffer(max_radius_deg), "0-"]
-                    bottom_left_neighbour = [Point(x - x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "--"]
-                    left_neighbour = [Point(x - x_max_radius_deg, y).buffer(max_radius_deg), "-0"]
-                    left_top_neighbour = [Point(x - x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "-+"]
+                        top_neighbour = [Point(x, y + max_radius_deg).buffer(max_radius_deg), "0+"]
+                        top_right_neighbour = [Point(x + x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "++"]
+                        right_neighbour = [Point(x + x_max_radius_deg, y).buffer(max_radius_deg), "+0"]
+                        right_bottom_neighbour = [Point(x + x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "+-"]
+                        bottom_neighbour = [Point(x, y - max_radius_deg).buffer(max_radius_deg), "0-"]
+                        bottom_left_neighbour = [Point(x - x_max_radius_deg, y - max_radius_deg).buffer(max_radius_deg), "--"]
+                        left_neighbour = [Point(x - x_max_radius_deg, y).buffer(max_radius_deg), "-0"]
+                        left_top_neighbour = [Point(x - x_max_radius_deg, y + max_radius_deg).buffer(max_radius_deg), "-+"]
 
-                    neighbours = [top_neighbour, top_right_neighbour, right_neighbour,
-                                  right_bottom_neighbour, bottom_neighbour, bottom_left_neighbour,
-                                  left_neighbour, left_top_neighbour]
+                        neighbours = [top_neighbour, top_right_neighbour, right_neighbour,
+                                      right_bottom_neighbour, bottom_neighbour, bottom_left_neighbour,
+                                      left_neighbour, left_top_neighbour]
 
-                    for n in neighbours:
-                        n[0] = scale(n[0], xfact=np.cos(np.radians(y)), yfact=1)
+                        for n in neighbours:
+                            n[0] = scale(n[0], xfact=np.cos(np.radians(y)), yfact=1)
 
-                    filtered_neighbours = [neighbour for neighbour in neighbours if polygon.contains(neighbour[0])]
+                        filtered_neighbours = [neighbour for neighbour in neighbours if polygon.contains(neighbour[0])]
 
-                    # First we check if there are only one neighbour - in that case direction will be equal to direction
-                    # of that neighbour from our circle point of view.
-                    if len(filtered_neighbours) == 1:
-                        direction = filtered_neighbours[0][1]
+                        # First we check if there are only one neighbour - in that case direction will be equal to direction
+                        # of that neighbour from our circle point of view.
+                        if len(filtered_neighbours) == 1:
+                            direction = filtered_neighbours[0][1]
 
-                    elif len(filtered_neighbours) == 0:
-                        direction = None
+                        elif len(filtered_neighbours) == 0:
+                            direction = None
 
-                    # If there are more than one neighbour, we calculate directions by adding them.
-                    else:
-                        # Extract only neighbours that are place not diagonally, because we don't want to count them
-                        non_diagonal_neighobours = [d[1] for d in filtered_neighbours if "0" in d[1]]
+                        # If there are more than one neighbour, we calculate directions by adding them.
+                        else:
+                            # Extract only neighbours that are place not diagonally, because we don't want to count them
+                            non_diagonal_neighobours = [d[1] for d in filtered_neighbours if "0" in d[1]]
 
-                        # Add directions of remaining neighbours to find direction we need to move our circle
-                        _x = 0
-                        _y = 0
-                        for d in non_diagonal_neighobours:
-                            if d[0] == "-":
-                                _x -= 1
-                            elif d[0] == "+":
-                                _x += 1
+                            # Add directions of remaining neighbours to find direction we need to move our circle
+                            _x = 0
+                            _y = 0
+                            for d in non_diagonal_neighobours:
+                                if d[0] == "-":
+                                    _x -= 1
+                                elif d[0] == "+":
+                                    _x += 1
 
-                            if d[1] == "-":
-                                _y -= 1
-                            elif d[1] == "+":
-                                _y += 1
+                                if d[1] == "-":
+                                    _y -= 1
+                                elif d[1] == "+":
+                                    _y += 1
 
-                        direction_mapping = {
-                            1: "+",
-                            0: "0",
-                            -1: "-"
-                        }
+                            direction_mapping = {
+                                1: "+",
+                                0: "0",
+                                -1: "-"
+                            }
 
-                        direction = f'{direction_mapping.get(_x)}{direction_mapping.get(_y)}'
+                            direction = f'{direction_mapping.get(_x)}{direction_mapping.get(_y)}'
 
-                    # Now when we have direction to move our circle, we will move it there decreasing it's radius by 1 km
-                    # until it will not overlap with border.
-                    if direction:
-                        overlaps = True
-                        radius_deg = (max_radius_km - 1) / 111
-                        while overlaps and radius_deg >= min_radius_deg:
-                            # Handle x coordinate
-                            if direction[0] == "-":
-                                x -= (1 / 111) / np.cos(np.radians(y))
-                            elif direction[0] == "+":
-                                x += (1 / 111) / np.cos(np.radians(y))
+                        # Now when we have direction to move our circle, we will move it there decreasing it's radius by 1 km
+                        # until it will not overlap with border.
+                        if direction:
+                            overlaps = True
+                            radius_deg = (max_radius_km - 1) / 111
+                            while overlaps and radius_deg >= min_radius_deg:
+                                # Handle x coordinate
+                                if direction[0] == "-":
+                                    x -= (1 / 111) / np.cos(np.radians(y))
+                                elif direction[0] == "+":
+                                    x += (1 / 111) / np.cos(np.radians(y))
 
-                            # Handle y coordinate
-                            if direction[1] == "-":
-                                y -= 1 / 111
-                            elif direction[1] == "+":
-                                y += 1 / 111
+                                # Handle y coordinate
+                                if direction[1] == "-":
+                                    y -= 1 / 111
+                                elif direction[1] == "+":
+                                    y += 1 / 111
 
-                            new_circle = Point(x, y).buffer(radius_deg)
-                            new_oval = scale(new_circle, xfact=1/x_scale_fact, yfact=1)
+                                new_circle = Point(x, y).buffer(radius_deg)
+                                new_oval = scale(new_circle, xfact=1/x_scale_fact, yfact=1)
 
-                            # If it fits, append it to the array of circles and exit loop
-                            if polygon.contains(new_oval):
-                                filtered_circles.append(new_oval)
-                                res_circle = Circle(country_name, [round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
-                                self.resulting_circles.append(res_circle)
-                                overlaps = False
-                            # Otherwise reduce radius by 1 km and start again
-                            else:
-                                radius_deg = radius_deg - 1 / 111
+                                # If it fits, append it to the array of circles and exit loop
+                                if polygon.contains(new_oval):
+                                    filtered_circles.append(new_oval)
+                                    res_circle = Circle(country_name, [round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
+                                    self.resulting_circles.append(res_circle)
+                                    overlaps = False
+                                # Otherwise reduce radius by 1 km and start again
+                                else:
+                                    radius_deg = radius_deg - 1 / 111
+
+                    pbar.update(1)
+
 
             if filtered_circles:
                 return filtered_circles
             elif not second_try:
-                # If country to small and 10km circles didn't fit in, call function again with 1 km circles
+                # If country too small and 10km circles didn't fit in, call function again with 1 km circles
                 small_circles = generate_circles_within_bbox(self.bounding_box, min_radius_deg)
                 return filter_circles_within_polygon(small_circles, polygon, second_try=True)
 
@@ -230,13 +235,16 @@ class CirclesGenerator:
         Adds to each circle name of a state/region where it's located
         :return:
         """
-        for circle in self.resulting_circles:
-            circle_center = Point(circle.coordinates[0], circle.coordinates[1])
-            state_obj = self.states[self.states.contains(circle_center)]
-            state_obj.to_crs('EPSG:3857')
+        with tqdm(total=len(self.resulting_circles), desc="Adding state names", unit="circle") as pbar:
+            for circle in self.resulting_circles:
+                circle_center = Point(circle.coordinates[0], circle.coordinates[1])
+                state_obj = self.states[self.states.contains(circle_center)]
+                state_obj.to_crs('EPSG:3857')
 
-            if not state_obj.empty:
-                circle.state = state_obj.iloc[0]["name_en"]
+                if not state_obj.empty:
+                    circle.state = state_obj.iloc[0]["name_en"]
+
+                pbar.update(1)
 
         if self.verbose:
             print("Circle state names parsed...")

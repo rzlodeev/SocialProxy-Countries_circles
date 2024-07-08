@@ -5,3 +5,4 @@ numpy
 shapely
 matplotlib
 folium
+tqdm
