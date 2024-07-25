@@ -6,3 +6,4 @@ shapely
 matplotlib
 folium
 tqdm
+osmnx

@@ -15,6 +15,7 @@ def main():
     country_or_world_group = parser.add_mutually_exclusive_group()
     country_or_world_group.add_argument('-c', '--country-name', type=str, nargs='+', help='Name of a country you want to get circles for.')
     country_or_world_group.add_argument('-w', '--world', action='store_true', help='Get countries for all countries in the world.')
+    country_or_world_group.add_argument('--city-name', type=str, nargs='+', help='Name of a city/-ies you want to get circles for.')
     parser.add_argument('-mn', '--min-radius', type=float, help='Min radius of resulting circles in kilometers. Defaults to 1.', default=1)
     parser.add_argument('-mx', '--max-radius', type=int, help='Max radius of resulting circles in kilometers. Defaults to 10.', default=10)
     parser.add_argument('-m', '--visualize', action='store_true', help='Visualize result using matplotlib.')
@@ -34,10 +35,15 @@ def main():
         for t in countries_list:
             print(t)
 
+    # When city name given, we will treat it as country
+    if args.city_name:
+        args.country_name = args.city_name
+
     # When country name given (-c flag)
     if args.country_name:
         for country_name_str in args.country_name:
-            circles_status = circles_generator.generate_circles(country_name_str, args.min_radius, args.max_radius)
+            circles_status = circles_generator.generate_circles(
+                country_name_str, args.min_radius, args.max_radius, is_a_city=True if args.city_name else False)
             if type(circles_status) == str:
                 print(circles_status)
             else:

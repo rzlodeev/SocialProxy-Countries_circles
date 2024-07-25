@@ -52,6 +52,16 @@ Countries with several words in the name are typed with brackets. Note that each
 You can also call several countries at once.
 ```bash
 python main.py -c Italy 'Saudi Arabia' -v
+```
+
+Get CSV file for a city:
+```bash
+python main.py --city-name "London, UK" -mn 0.1 -mx 1
+```
+
+Makes sense to change circle sizes with -mn and -mx parameter.
+City name format: "City, Country". App has integration with Nominatim API, that searches for your string in dataset
+in a free-form query format. You can check out their suggestions on what you should type [here](https://nominatim.org/release-docs/latest/api/Search/#free-form-query)
 
 Get CSV file for all countries in a world:
 ```bash
@@ -85,3 +95,6 @@ Each csv and html map file follows this name structure:
 | `--verbose` | `-v` | `store_true` | Verbose mode. Keeps you in touch with program progress. | False |
 | `--overwrite-files` | `-o` | `store_true`| Overwrite existing files in temp directory when processing the whole world. | False |
 
+## Citation
+
+ - Boeing, G. (2024). Modeling and Analyzing Urban Networks and Amenities with OSMnx. Working paper. https://geoffboeing.com/publications/osmnx-paper/

@@ -1,9 +1,11 @@
 import geopandas as gpd
+import requests
 import shapely
 from shapely.geometry import Point, Polygon, box
 from shapely.affinity import scale
 import matplotlib.pyplot as plt
 import numpy as np
+import osmnx as ox
 from tqdm import tqdm
 
 import csv
@@ -26,26 +28,44 @@ class CirclesGenerator:
         self.polygon = None  # Placeholder for shape of a country
         self.filtered_circles = []  # Placeholder for circles within country shape in shape format
         self.resulting_circles = []  # Placeholder for circles in output format - [[x, y], radius]
+
         self.world = gpd.read_file('./data/world-administrative-boundaries/world-administrative-boundaries.shp')  # Shapes of all countries
         self.states = gpd.read_file('./data/ne_10m_admin_1_states_provinces/ne_10m_admin_1_states_provinces.shp')  # Shapes of all states in countries
+        self.overpass_url = "http://overpass-api.de/api/interpreter"  # Overpass API url to get shape of the cities
 
         self.verbose = verbose
 
-    def generate_circles(self, country_name, min_circle_radius, max_circle_radius, as_shapes=False) -> list | str:
+    def get_city_shape(self, city_name=str):
+        """
+        Calls OpenStreetMap API to get shapefile for given city
+        :param city_name:
+        :return: DataFrame object with city shape
+        """
+
+        # Get city shape using osmnx
+        city_shape = ox.geocode_to_gdf(city_name)
+
+        return city_shape
+
+    def generate_circles(self, country_name, min_circle_radius, max_circle_radius, as_shapes=False, is_a_city=False) -> list | str:
         """
         Generates circles set for given country.
         :param country_name: Country name to generate circles to
         :param min_circle_radius: Minimal radius for a circle, in kilometers
         :param max_circle_radius: Max radius for a circle, in kilometers
         :param as_shapes: If true, returns circles shapes instead of coordinates and radius
+        :param is_a_city: If true, 'country name' argument is a city name, not country
         :return: List of
         """
         self.resulting_circles = []  # Clear circles from previous generation
         self.country_name = country_name
-        country = self.world.loc[self.world['name'] == country_name]
+        if not is_a_city:
+            country = self.world.loc[self.world['name'] == country_name]
+        else:
+            country = self.get_city_shape(country_name)
 
         if country.empty:
-            return "Country not found in the dataset"
+            return f"{'City' if is_a_city else 'Country'} not found in the dataset"
 
         polygon = country.geometry.iloc[0]
         self.polygon = polygon
@@ -177,23 +197,23 @@ class CirclesGenerator:
 
                             direction = f'{direction_mapping.get(_x)}{direction_mapping.get(_y)}'
 
-                        # Now when we have direction to move our circle, we will move it there decreasing it's radius by 1 km
+                        # Now when we have direction to move our circle, we will move it there decreasing it's radius by min circle radius
                         # until it will not overlap with border.
                         if direction:
                             overlaps = True
-                            radius_deg = (max_radius_km - 1) / 111
+                            radius_deg = (max_radius_km - min_radius_km) / 111
                             while overlaps and radius_deg >= min_radius_deg:
                                 # Handle x coordinate
                                 if direction[0] == "-":
-                                    x -= (1 / 111) / np.cos(np.radians(y))
+                                    x -= min_radius_deg / np.cos(np.radians(y))
                                 elif direction[0] == "+":
-                                    x += (1 / 111) / np.cos(np.radians(y))
+                                    x += min_radius_deg / np.cos(np.radians(y))
 
                                 # Handle y coordinate
                                 if direction[1] == "-":
-                                    y -= 1 / 111
+                                    y -= min_radius_deg
                                 elif direction[1] == "+":
-                                    y += 1 / 111
+                                    y += min_radius_deg
 
                                 new_circle = Point(x, y).buffer(radius_deg)
                                 new_oval = scale(new_circle, xfact=1/x_scale_fact, yfact=1)
@@ -201,12 +221,12 @@ class CirclesGenerator:
                                 # If it fits, append it to the array of circles and exit loop
                                 if polygon.contains(new_oval):
                                     filtered_circles.append(new_oval)
-                                    res_circle = Circle(country_name, [round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111))
+                                    res_circle = Circle(country_name, [round(x.item(), 7), round(y.item(), 7)], round(radius_deg * 111, 1))
                                     self.resulting_circles.append(res_circle)
                                     overlaps = False
-                                # Otherwise reduce radius by 1 km and start again
+                                # Otherwise reduce radius by min_radius and start again
                                 else:
-                                    radius_deg = radius_deg - 1 / 111
+                                    radius_deg = radius_deg - min_radius_deg
 
                     pbar.update(1)
 
